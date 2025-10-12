@@ -19,6 +19,17 @@ app.post('/api/invoice', (req, res) => {
   }
 });
 
+// Endpoint to generate a server-unique receipt number (sequential)
+app.post('/api/receipt-number', (req, res) => {
+  try {
+    const rn = require('./lib/server-app').generateReceiptNumberSequential();
+    res.json({ receiptNumber: rn });
+  } catch (err) {
+    console.error('Failed to generate receipt number', err);
+    res.status(500).json({ error: 'Failed to generate receipt number' });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Invoice backend running on http://localhost:${PORT}`);

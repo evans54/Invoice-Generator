@@ -35,6 +35,9 @@ npm start
 - Keep DOM queries scoped (use container elements) to avoid accidental global collisions.
 - Data shape for history stored in localStorage: array of objects each with { number, type: 'invoice'|'receipt', date (ISO string), client, amount }.
   - Example access: JSON.parse(localStorage.getItem('invoiceHistory') || '[]')
+ - Data shape for history stored in localStorage: array of objects each with { number, type: 'invoice'|'receipt', date (ISO string), client, amount, payload }.
+  - `payload` contains the full invoice/receipt data and `payload.invoiceStatus` ("pending"|"paid").
+  - Receipts include `payload.receiptNumber` with format `RCT-YYYYMMDD-XXXX` (client-generated random suffix).
 - Invoice numbering is formatted as `INV-0001` and last used number stored in `lastInvoiceNumber` (integer).
 - PDF generation flow: call `updatePreview()` to render HTML for export, then `html2canvas` the preview element, convert to image and feed to jsPDF. Pagination logic is implemented by slicing based on canvas height.
 
@@ -75,6 +78,9 @@ It returns a `application/pdf` attachment.
 - Adding UI controls: follow existing pattern where elements are created in HTML and hooked by id at DOMContentLoaded, e.g., `document.getElementById('generateInvoiceBtn').addEventListener('click', generateInvoicePDF)`.
 - Adding a new computed field: update `calculateAmounts()` (central place for amounts) and ensure preview (`updatePreview()`) outputs matching values.
 - Mutating history: use `saveToHistory(type)` helper which ensures uniqueness by `number` and increments `lastInvoiceNumber` when saving invoices.
+ - Mutating history: use `saveToHistory(type)` helper which now stores the full payload under `payload` and sets `payload.invoiceStatus`. When saving a receipt (`type: 'receipt'`) the invoice entry is updated to `invoiceStatus: 'paid'` and a separate receipt entry is inserted so receipts can be listed independently.
+  - History now stores the full `payload` object for each entry (so invoices and receipts can be re-loaded and re-downloaded). Use `localStorage.getItem('invoiceHistory')` to inspect.
+  - Receipts are stored with `type: 'receipt'` and a generated `payload.receiptNumber` (format `RCT-YYYYMMDD-XXXX`).
 
 6) Edge-cases and conservative defaults observed in code
 - Numeric parsing uses `parseFloat(... ) || 0` to default invalid inputs to zero. Follow similar defensive parsing.
@@ -89,6 +95,10 @@ It returns a `application/pdf` attachment.
 - Global data keys in localStorage (`invoiceHistory`, `lastInvoiceNumber`) — changing them will break persisted user data and history migration must be provided.
 - The basic client-side PDF generation approach (html2canvas -> jsPDF) — it's fragile but works offline; any replacement should preserve offline/export behavior.
 - The backend `lib/server-app.js` uses a simple PDFKit template. Replacing it with a headless-browser rendering (Puppeteer) is possible but will add heavier dependencies and a different deployment model.
+
+Receipts dashboard
+- A new Receipts dashboard is available in the header (button `Receipts`). It lists generated receipts (read-only): you can preview and download receipts. Receipts are automatically created when an invoice is marked as paid (the client saves a receipt entry to `invoiceHistory` with `type: 'receipt'`).
+- The Receipts dashboard only allows previewing and downloading receipts; it does not allow editing receipts (invoices remain editable via Invoice History -> Edit).
 
 CI:
 - A lightweight GitHub Actions workflow is present at `.github/workflows/nodejs.yml` which installs dependencies and runs a smoke `require('./server.js')` to catch syntax/runtime issues in the server.
