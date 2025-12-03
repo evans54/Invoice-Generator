@@ -396,10 +396,10 @@ function updatePreview() {
               <div>
                   <h3 class="text-sm font-medium text-gray-500 mb-1">From</h3>
                   <p class="font-bold text-lessy-blue">Lessy Communication Agency</p>
-                  <p class="text-sm">123 Business Street</p>
+                  <p class="text-sm">RED DIAMOND GROUND FLOOR ROOM: 2, RUARAKA, OTERING ROAD</p>
                   <p class="text-sm">Nairobi, Kenya</p>
-                  <p class="text-sm">Phone: +254 700 123456</p>
-                  <p class="text-sm">Email: invoicing@lessyagency.com</p>
+                  <p class="text-sm">Phone: +254717321229</p>
+                  <p class="text-sm">Email: admin@lessycommunications.co.ke</p>
               </div>
               <div>
                   <h3 class="text-sm font-medium text-gray-500 mb-1">Bill To</h3>
