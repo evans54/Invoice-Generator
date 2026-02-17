@@ -165,7 +165,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Event listeners with optimized DOM access
   domCache.get('addService').addEventListener('click', addServiceRow);
-  domCache.get('previewBtn').addEventListener('click', updatePreview);
   domCache.get('generateInvoiceBtn').addEventListener('click', generateInvoiceServerPDF);
   // New save & pending buttons
   const saveBtn = document.getElementById('saveInvoiceBtn');
@@ -202,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const downloadSelectedHistoryBtn = document.getElementById('downloadSelectedHistoryBtn');
   if (downloadSelectedHistoryBtn) downloadSelectedHistoryBtn.addEventListener('click', downloadSelectedFromHistory);
 
-  // Enhanced form input handling with validation
+  // Enhanced form input handling with validation and automatic preview
   document.addEventListener('input', debounce(function(e) {
     if (e.target.classList.contains('service-qty') ||
       e.target.classList.contains('service-rate') ||
@@ -215,6 +214,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update progress and validation
     validateForm();
     updateCurrentInvoiceDisplay();
+    // Automatically update preview when form changes
+    updatePreview();
+  }, 500));
+
+  // Handle select elements and other form controls that trigger change events
+  document.addEventListener('change', debounce(function(e) {
+    if (e.target.tagName === 'SELECT' ||
+        e.target.type === 'date' ||
+        e.target.type === 'email' ||
+        e.target.type === 'tel') {
+      // Update progress and validation
+      validateForm();
+      updateCurrentInvoiceDisplay();
+      // Automatically update preview when form changes
+      updatePreview();
+    }
   }, 300));
 
   // Status change handler
