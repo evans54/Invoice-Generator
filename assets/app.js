@@ -505,6 +505,10 @@ function updatePreview() {
       <div class="mb-8">
           <div class="flex justify-between items-start mb-8">
               <div>
+                  <!-- Company Logo -->
+                  <div class="mb-4">
+                      <img src="assets/logo.png" alt="Company Logo" class="h-16 w-auto max-w-32 object-contain" onerror="this.style.display='none'">
+                  </div>
                   <div class="w-16 h-16 bg-lessy-blue rounded-lg flex items-center justify-center mb-2">
                       <i data-feather="file-text" class="text-lessy-gold w-8 h-8"></i>
                   </div>
