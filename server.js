@@ -5,6 +5,9 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { streamInvoicePDF } = require('./lib/server-app');
 
+// Load environment variables
+require('dotenv').config();
+
 const app = express();
 
 // Security headers
@@ -22,11 +25,32 @@ app.use(helmet({
 
 // Configure CORS for specific origins in production
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://yourdomain.com'] // Replace with your actual domain
-    : true, // Allow all origins in development
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    // In production, allow the same origin as the server
+    if (process.env.NODE_ENV === 'production') {
+      const allowedOrigins = [
+        process.env.FRONTEND_URL, // Custom frontend URL if set
+        // Add your production domain here when you know it
+        // 'https://yourdomain.com',
+        // 'https://www.yourdomain.com'
+      ].filter(Boolean); // Remove undefined values
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error('Not allowed by CORS'));
+      }
+    }
+
+    // In development, allow all origins
+    return callback(null, true);
+  },
   methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 };
 app.use(cors(corsOptions));
 
@@ -39,6 +63,14 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 app.use(bodyParser.json({ limit: '2mb' }));
+
+// Serve static files (frontend)
+app.use(express.static('.'));
+
+// Route for root path - serve the main HTML file
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/index.html');
+});
 
 app.post('/api/invoice', (req, res) => {
   try {
