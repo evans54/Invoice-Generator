@@ -7,7 +7,7 @@ const currencySymbols = {
   KSH: 'KSh ',
   TZS: 'TSh ',
   EURO: '€',
-  PUNDS: '£'
+  POUNDS: '£'
 };
 
 // Static exchange rates relative to USD. These are editable in the module.
@@ -17,7 +17,7 @@ const staticRatesToUSD = {
   KSH: 1 / 155.0,   // 1 KSH ~= 0.00645 USD (i.e., 155 KSH = 1 USD)
   TZS: 1 / 2350.0,  // 1 TZS ~= 0.0004255 USD
   EURO: 1.08,       // 1 EURO ~= 1.08 USD (example static)
-  PUNDS: 1.25      // 1 GBP ~= 1.25 USD (example static)
+  POUNDS: 1.25      // 1 GBP ~= 1.25 USD (example static)
 };
 
 function convertAmount(amount, from, to) {
