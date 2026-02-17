@@ -296,7 +296,83 @@ function createNewInvoice() {
     actuallyCreateNewInvoice();
 }
 
-function actuallyCreateNewInvoice() {
+async function actuallyCreateNewInvoice() {
+    try {
+        // Get the next invoice number from server
+        const response = await fetch('/api/invoices');
+        const data = await response.json();
+        const invoices = data.invoices || [];
+        
+        // Find the highest invoice number and increment
+        let maxNum = 0;
+        invoices.forEach(invoice => {
+            const match = invoice.invoiceNumber.match(/INV-(\d+)/);
+            if (match) {
+                const num = parseInt(match[1], 10);
+                if (num > maxNum) maxNum = num;
+            }
+        });
+        
+        const nextNum = maxNum + 1;
+        const nextInvoiceNumber = `INV-${String(nextNum).padStart(4, '0')}`;
+        
+        // reset client fields
+        const clientName = document.getElementById('clientName');
+        if (clientName) clientName.value = '';
+        const clientCompany = document.getElementById('clientCompany');
+        if (clientCompany) clientCompany.value = '';
+        const clientEmail = document.getElementById('clientEmail');
+        if (clientEmail) clientEmail.value = '';
+        const clientPhone = document.getElementById('clientPhone');
+        if (clientPhone) clientPhone.value = '';
+        const clientAddress = document.getElementById('clientAddress');
+        if (clientAddress) clientAddress.value = '';
+        const invoiceNotes = document.getElementById('invoiceNotes');
+        if (invoiceNotes) invoiceNotes.value = '';
+        const taxRate = document.getElementById('taxRate');
+        if (taxRate) taxRate.value = '0';
+        const discountAmt = document.getElementById('discountAmt');
+        if (discountAmt) discountAmt.value = '0';
+        const currencySelect = document.getElementById('currencySelect');
+        if (currencySelect) currencySelect.value = 'USD';
+        const invoiceStatus = document.getElementById('invoiceStatus');
+        if (invoiceStatus) invoiceStatus.value = 'pending';
+
+        // reset dates
+        const today = new Date();
+        const dueDate = new Date(); dueDate.setDate(today.getDate() + 14);
+        const issueDate = document.getElementById('issueDate');
+        if (issueDate) issueDate.valueAsDate = today;
+        const dueDateEl = document.getElementById('dueDate');
+        if (dueDateEl) dueDateEl.valueAsDate = dueDate;
+
+        // reset services table to one empty row
+        const table = document.getElementById('servicesTable');
+        if (table) {
+          table.innerHTML = '';
+          addServiceRow();
+        }
+
+        // set invoice number to next available
+        const invoiceNumber = document.getElementById('invoiceNumber');
+        if (invoiceNumber) invoiceNumber.value = nextInvoiceNumber;
+
+        // Update localStorage for compatibility
+        localStorage.setItem('lastInvoiceNumber', nextNum.toString());
+
+        calculateAmounts();
+        updatePreview();
+        updateCurrentInvoiceDisplay();
+        showToast('New invoice form initialized', 'success');
+    } catch (error) {
+        console.error('Error creating new invoice:', error);
+        // Fallback to localStorage method if server fails
+        fallbackCreateNewInvoice();
+    }
+}
+
+// Fallback function for creating new invoice if server fails
+function fallbackCreateNewInvoice() {
     // reset client fields
     const clientName = document.getElementById('clientName');
     if (clientName) clientName.value = '';
@@ -334,14 +410,16 @@ function actuallyCreateNewInvoice() {
       addServiceRow();
     }
 
-    // set invoice number to next available but do NOT increment lastInvoiceNumber yet
+    // set invoice number to next available using localStorage
     let nextNum = parseInt(localStorage.getItem('lastInvoiceNumber') || '1', 10);
     if (isNaN(nextNum) || nextNum < 1) nextNum = 1;
     const invoiceNumber = document.getElementById('invoiceNumber');
     if (invoiceNumber) invoiceNumber.value = `INV-${String(nextNum).padStart(4, '0')}`;
 
     calculateAmounts();
-    showToast('New invoice form initialized', 'success');
+    updatePreview();
+    updateCurrentInvoiceDisplay();
+    showToast('New invoice form initialized (offline mode)', 'success');
 }
 
     // Strict unsaved-change detection: compare current form to lastLoadedPayload if available
