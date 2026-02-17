@@ -42,29 +42,96 @@
             color: #10b981;
             font-weight: bold;
         }
+        .step-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .step-indicator.active {
+            color: #1a365d;
+        }
+        .step-circle {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: #d4af37;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+        }
+        .step-line {
+            width: 40px;
+            height: 2px;
+            background-color: #d4af37;
+            margin: 0 10px;
+        }
+        .step-label {
+            font-size: 12px;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body class="bg-lessy-light min-h-screen">
     <div class="container mx-auto px-4 py-8">
-        <!-- Header -->
         <header class="flex justify-between items-center mb-8">
             <div class="flex items-center">
                 <div class="w-16 h-16 bg-lessy-blue rounded-lg flex items-center justify-center mr-4">
                     <i data-feather="file-text" class="text-lessy-gold w-8 h-8"></i>
                 </div>
-                <h1 class="text-3xl font-bold text-lessy-blue">Lessy Invoice Wizard</h1>
+                <div>
+                    <h1 class="text-3xl font-bold text-lessy-blue">Invoice Generator</h1>
+                    <p class="text-sm text-gray-600 mt-1">Create professional invoices in minutes</p>
+                </div>
             </div>
             <div class="flex items-center gap-4">
+                <div class="text-right">
+                    <div class="text-sm text-gray-600">Current Invoice</div>
+                    <div id="currentInvoiceDisplay" class="font-semibold text-lessy-blue">INV-0001</div>
+                </div>
+                <button id="helpBtn" class="p-2 text-gray-500 hover:text-lessy-blue transition" title="Help & Tips">
+                    <i data-feather="help-circle" class="w-5 h-5"></i>
+                </button>
                 <button id="receiptsBtn" class="flex items-center text-lessy-blue hover:text-lessy-gold transition">
                     <i data-feather="file-text" class="mr-2"></i>
                     Receipts
                 </button>
                 <button id="historyBtn" class="flex items-center text-lessy-blue hover:text-lessy-gold transition">
                     <i data-feather="clock" class="mr-2"></i>
-                    Invoice History
+                    History
                 </button>
             </div>
         </header>
+
+        <!-- Step Progress Indicator -->
+        <div class="mb-6">
+            <div class="flex items-center justify-center">
+                <div class="flex items-center space-x-4">
+                    <div class="step-indicator active" data-step="1">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">Details</div>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step-indicator" data-step="2">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">Client</div>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step-indicator" data-step="3">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">Services</div>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step-indicator" data-step="4">
+                        <div class="step-circle">4</div>
+                        <div class="step-label">Review</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <!-- Invoice Form -->
@@ -74,35 +141,60 @@
                 <!-- Invoice Info -->
                 <div class="grid grid-cols-2 gap-4 mb-6">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
-                                                <div class="flex gap-2 items-center">
-                                                    <input type="text" id="invoiceNumber" class="w-2/3 px-3 py-2 border border-gray-300 rounded-md" value="INV-0001" readonly>
-                                                    <select id="invoiceStatus" class="w-1/3 px-2 py-2 border border-gray-300 rounded-md">
-                                                        <option value="pending" selected>Pending</option>
-                                                        <option value="paid">Paid</option>
-                                                    </select>
-                                                </div>
-                                                <div class="mt-2">
-                                                    <span id="duplicateBadge" class="text-xs text-gray-600 hidden">Duplicate of <strong id="duplicateSource"></strong></span>
-                                                </div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Invoice Number <span class="text-red-500">*</span>
+                            <span class="text-xs text-gray-500 ml-1" title="Auto-generated sequentially">ⓘ</span>
+                        </label>
+                        <div class="flex gap-2 items-center">
+                            <input type="text" id="invoiceNumber" class="w-2/3 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" value="INV-0001" readonly>
+                            <select id="invoiceStatus" class="w-1/3 px-2 py-2 border border-gray-300 rounded-md">
+                                <option value="draft">📝 Draft</option>
+                                <option value="pending" selected>⏳ Pending</option>
+                                <option value="paid">✅ Paid</option>
+                            </select>
+                        </div>
+                        <div class="mt-2">
+                            <span id="duplicateBadge" class="text-xs text-gray-600 hidden">Duplicate of <strong id="duplicateSource"></strong></span>
+                        </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
-                        <input type="date" id="issueDate" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Issue Date <span class="text-red-500">*</span>
+                        </label>
+                        <input type="date" id="issueDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" required>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-                        <input type="date" id="dueDate" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Due Date <span class="text-red-500">*</span>
+                            <span class="text-xs text-gray-500 ml-1" title="Payment is due by this date">ⓘ</span>
+                        </label>
+                        <input type="date" id="dueDate" class="w-full px-3 py-2 border border-gray-300 rounded-md" required>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
                         <select id="paymentMethod" class="w-full px-3 py-2 border border-gray-300 rounded-md">
-                            <option value="M-Pesa">M-Pesa</option>
-                            <option value="PayPal">PayPal</option>
-                            <option value="Wise">Wise</option>
-                            <option value="Bank Transfer">Bank Transfer</option>
-                            <option value="Cash">Cash</option>
+                            <option value="M-Pesa">📱 M-Pesa</option>
+                            <option value="PayPal">💳 PayPal</option>
+                            <option value="Wise">🌍 Wise</option>
+                            <option value="Bank Transfer">🏦 Bank Transfer</option>
+                            <option value="Cash">💵 Cash</option>
                         </select>
+                    </div>
+                </div>
+
+                <!-- Progress Status -->
+                <div class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i data-feather="info" class="w-4 h-4 text-blue-600 mr-2"></i>
+                            <span class="text-sm text-blue-800">Invoice Status: <strong id="statusText">Draft</strong></span>
+                        </div>
+                        <div class="text-xs text-blue-600">
+                            <span id="completionProgress">0%</span> Complete
+                        </div>
+                    </div>
+                    <div class="mt-2 bg-blue-200 rounded-full h-2">
+                        <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
                     </div>
                 </div>
 
@@ -197,28 +289,39 @@
                     <textarea id="invoiceNotes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="Additional notes or terms..."></textarea>
                 </div>
 
-                <!-- Action Buttons -->
-                <div class="flex flex-wrap gap-3">
-                    <button id="previewBtn" class="px-4 py-2 bg-lessy-blue text-white rounded-md hover:bg-opacity-90 transition flex items-center">
-                        <i data-feather="eye" class="mr-2"></i> Preview
+                <!-- Action Buttons - Primary Actions -->
+                <div class="flex flex-wrap gap-2 mb-3">
+                    <button id="previewBtn" class="flex-1 min-w-0 px-3 py-2 bg-lessy-blue text-white rounded-md hover:bg-opacity-90 transition text-sm flex items-center justify-center">
+                        <i data-feather="eye" class="mr-1 w-4 h-4"></i>
+                        <span class="hidden sm:inline">Preview</span>
                     </button>
-                    <button id="generateInvoiceBtn" class="px-4 py-2 bg-lessy-gold text-lessy-blue rounded-md hover:bg-opacity-90 transition flex items-center">
-                        <i data-feather="download" class="mr-2"></i> Download Invoice
+                    <button id="generateInvoiceBtn" class="flex-1 min-w-0 px-3 py-2 bg-lessy-gold text-lessy-blue rounded-md hover:bg-opacity-90 transition text-sm flex items-center justify-center">
+                        <i data-feather="download" class="mr-1 w-4 h-4"></i>
+                        <span class="hidden sm:inline">Download</span>
                     </button>
-                    <button id="saveInvoiceBtn" class="px-4 py-2 bg-gray-200 text-lessy-blue rounded-md hover:bg-opacity-90 transition flex items-center">
-                        <i data-feather="save" class="mr-2"></i> Save Invoice
+                    <button id="saveInvoiceBtn" class="flex-1 min-w-0 px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-opacity-90 transition text-sm flex items-center justify-center">
+                        <i data-feather="save" class="mr-1 w-4 h-4"></i>
+                        <span class="hidden sm:inline">Save</span>
                     </button>
-                    <button id="createNewInvoiceBtn" class="px-4 py-2 bg-lessy-blue text-white rounded-md hover:bg-opacity-90 transition flex items-center">
-                        <i data-feather="plus" class="mr-2"></i> Create New Invoice
+                </div>
+
+                <!-- Secondary Actions -->
+                <div class="flex flex-wrap gap-2">
+                    <button id="createNewInvoiceBtn" class="px-3 py-2 bg-lessy-blue text-white rounded-md hover:bg-opacity-90 transition text-sm flex items-center">
+                        <i data-feather="plus" class="mr-1 w-4 h-4"></i>
+                        <span class="hidden sm:inline">New Invoice</span>
                     </button>
-                    <button id="duplicateInvoiceBtn" class="px-4 py-2 bg-gray-200 text-lessy-blue rounded-md hover:bg-opacity-90 transition flex items-center">
-                        <i data-feather="copy" class="mr-2"></i> Duplicate Invoice
+                    <button id="duplicateInvoiceBtn" class="px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-opacity-90 transition text-sm flex items-center">
+                        <i data-feather="copy" class="mr-1 w-4 h-4"></i>
+                        <span class="hidden sm:inline">Duplicate</span>
                     </button>
-                    <button id="markAsPendingBtn" class="px-4 py-2 bg-yellow-400 text-lessy-blue rounded-md hover:bg-opacity-90 transition flex items-center">
-                        <i data-feather="clock" class="mr-2"></i> Mark as Pending
+                    <button id="markAsPendingBtn" class="px-3 py-2 bg-yellow-500 text-white rounded-md hover:bg-opacity-90 transition text-sm flex items-center">
+                        <i data-feather="clock" class="mr-1 w-4 h-4"></i>
+                        <span class="hidden sm:inline">Pending</span>
                     </button>
-                    <button id="markAsPaidBtn" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-opacity-90 transition flex items-center">
-                        <i data-feather="check-circle" class="mr-2"></i> Mark as Paid
+                    <button id="markAsPaidBtn" class="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-opacity-90 transition text-sm flex items-center">
+                        <i data-feather="check-circle" class="mr-1 w-4 h-4"></i>
+                        <span class="hidden sm:inline">Mark Paid</span>
                     </button>
                 </div>
             </div>
@@ -323,6 +426,101 @@
                 <div id="receiptPreviewPanel" class="p-4 border rounded"></div>
                 <div class="mt-3 flex justify-end gap-2">
                     <button id="downloadSelectedReceiptBtn" class="px-3 py-2 bg-lessy-blue text-white rounded">Download Receipt</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help & Tips Modal -->
+    <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-semibold text-lessy-blue">Help & Tips</h3>
+                <button id="closeHelpModal" class="text-gray-500 hover:text-gray-700">
+                    <i data-feather="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <div class="space-y-6">
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h4 class="font-semibold text-blue-800 mb-2">🚀 Quick Start</h4>
+                    <ul class="text-sm text-blue-700 space-y-1">
+                        <li>• Fill in basic invoice details (dates are required)</li>
+                        <li>• Add client information to personalize your invoice</li>
+                        <li>• Add services with descriptions, quantities, and rates</li>
+                        <li>• Preview your invoice and download as PDF</li>
+                    </ul>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="border rounded-lg p-4">
+                        <h4 class="font-semibold text-gray-800 mb-2 flex items-center">
+                            <i data-feather="file-text" class="w-4 h-4 mr-2 text-lessy-blue"></i>
+                            Invoice Status
+                        </h4>
+                        <ul class="text-sm text-gray-600 space-y-1">
+                            <li><strong>Draft:</strong> Work in progress</li>
+                            <li><strong>Pending:</strong> Sent to client</li>
+                            <li><strong>Paid:</strong> Payment received</li>
+                        </ul>
+                    </div>
+
+                    <div class="border rounded-lg p-4">
+                        <h4 class="font-semibold text-gray-800 mb-2 flex items-center">
+                            <i data-feather="dollar-sign" class="w-4 h-4 mr-2 text-lessy-blue"></i>
+                            Currency Support
+                        </h4>
+                        <p class="text-sm text-gray-600">
+                            Automatic conversion between USD, KSH, TZS, EURO, and GBP. Rates are updated regularly.
+                        </p>
+                    </div>
+
+                    <div class="border rounded-lg p-4">
+                        <h4 class="font-semibold text-gray-800 mb-2 flex items-center">
+                            <i data-feather="save" class="w-4 h-4 mr-2 text-lessy-blue"></i>
+                            Saving & History
+                        </h4>
+                        <p class="text-sm text-gray-600">
+                            Save drafts to continue later. Access invoice history to edit or duplicate previous invoices.
+                        </p>
+                    </div>
+
+                    <div class="border rounded-lg p-4">
+                        <h4 class="font-semibold text-gray-800 mb-2 flex items-center">
+                            <i data-feather="download" class="w-4 h-4 mr-2 text-lessy-blue"></i>
+                            PDF Generation
+                        </h4>
+                        <p class="text-sm text-gray-600">
+                            Professional PDFs with your business branding. Includes payment instructions and terms.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <h4 class="font-semibold text-yellow-800 mb-2">💡 Pro Tips</h4>
+                    <ul class="text-sm text-yellow-700 space-y-1">
+                        <li>• Use descriptive service names for clarity</li>
+                        <li>• Set due dates 14-30 days from issue date</li>
+                        <li>• Include payment terms in the notes section</li>
+                        <li>• Save drafts frequently to avoid losing work</li>
+                        <li>• Duplicate successful invoices as templates</li>
+                    </ul>
+                </div>
+
+                <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                    <h4 class="font-semibold text-green-800 mb-2">🎯 Keyboard Shortcuts</h4>
+                    <div class="grid grid-cols-2 gap-4 text-sm text-green-700">
+                        <div>
+                            <strong>Ctrl+S:</strong> Save invoice<br>
+                            <strong>Ctrl+N:</strong> New invoice<br>
+                            <strong>Ctrl+P:</strong> Preview
+                        </div>
+                        <div>
+                            <strong>Ctrl+D:</strong> Download PDF<br>
+                            <strong>Ctrl+H:</strong> History<br>
+                            <strong>F1:</strong> Help
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
