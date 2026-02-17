@@ -172,12 +172,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (saveBtn) saveBtn.addEventListener('click', async () => { await saveInvoice(); });
   const pendingBtn = document.getElementById('markAsPendingBtn');
   if (pendingBtn) pendingBtn.addEventListener('click', async () => { await markAsPending(); });
-  document.getElementById('markAsPaidBtn').addEventListener('click', markAsPaid);
+  const markAsPaidBtn = document.getElementById('markAsPaidBtn');
+  if (markAsPaidBtn) markAsPaidBtn.addEventListener('click', markAsPaid);
   const completedBtn = document.getElementById('markAsCompletedBtn');
   if (completedBtn) completedBtn.addEventListener('click', markAsCompleted);
-  document.getElementById('downloadReceiptBtn').addEventListener('click', generateReceiptServerPDF);
-  document.getElementById('historyBtn').addEventListener('click', openHistoryModal);
-  document.getElementById('closeHistoryModal').addEventListener('click', closeHistoryModal);
+  const downloadReceiptBtn = document.getElementById('downloadReceiptBtn');
+  if (downloadReceiptBtn) downloadReceiptBtn.addEventListener('click', generateReceiptServerPDF);
+  const historyBtn = document.getElementById('historyBtn');
+  if (historyBtn) historyBtn.addEventListener('click', openHistoryModal);
+  const closeHistoryModal = document.getElementById('closeHistoryModal');
+  if (closeHistoryModal) closeHistoryModal.addEventListener('click', closeHistoryModal);
   // Receipts dashboard
   const receiptsBtn = document.getElementById('receiptsBtn');
   if (receiptsBtn) receiptsBtn.addEventListener('click', openReceiptsModal);
@@ -252,7 +256,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 300));
 
   // Status change handler
-  document.getElementById('invoiceStatus').addEventListener('change', updateStatusText);
+  const invoiceStatus = document.getElementById('invoiceStatus');
+  if (invoiceStatus) invoiceStatus.addEventListener('change', updateStatusText);
 
   // Keyboard shortcuts
   document.addEventListener('keydown', handleKeyboardShortcuts);
@@ -293,32 +298,47 @@ function createNewInvoice() {
 
 function actuallyCreateNewInvoice() {
     // reset client fields
-    document.getElementById('clientName').value = '';
-    document.getElementById('clientCompany').value = '';
-    document.getElementById('clientEmail').value = '';
-    document.getElementById('clientPhone').value = '';
-    document.getElementById('clientAddress').value = '';
-    document.getElementById('invoiceNotes').value = '';
-    document.getElementById('taxRate').value = '0';
-    document.getElementById('discountAmt').value = '0';
-    document.getElementById('currencySelect').value = 'USD';
-    if (document.getElementById('invoiceStatus')) document.getElementById('invoiceStatus').value = 'pending';
+    const clientName = document.getElementById('clientName');
+    if (clientName) clientName.value = '';
+    const clientCompany = document.getElementById('clientCompany');
+    if (clientCompany) clientCompany.value = '';
+    const clientEmail = document.getElementById('clientEmail');
+    if (clientEmail) clientEmail.value = '';
+    const clientPhone = document.getElementById('clientPhone');
+    if (clientPhone) clientPhone.value = '';
+    const clientAddress = document.getElementById('clientAddress');
+    if (clientAddress) clientAddress.value = '';
+    const invoiceNotes = document.getElementById('invoiceNotes');
+    if (invoiceNotes) invoiceNotes.value = '';
+    const taxRate = document.getElementById('taxRate');
+    if (taxRate) taxRate.value = '0';
+    const discountAmt = document.getElementById('discountAmt');
+    if (discountAmt) discountAmt.value = '0';
+    const currencySelect = document.getElementById('currencySelect');
+    if (currencySelect) currencySelect.value = 'USD';
+    const invoiceStatus = document.getElementById('invoiceStatus');
+    if (invoiceStatus) invoiceStatus.value = 'pending';
 
     // reset dates
     const today = new Date();
     const dueDate = new Date(); dueDate.setDate(today.getDate() + 14);
-    document.getElementById('issueDate').valueAsDate = today;
-    document.getElementById('dueDate').valueAsDate = dueDate;
+    const issueDate = document.getElementById('issueDate');
+    if (issueDate) issueDate.valueAsDate = today;
+    const dueDateEl = document.getElementById('dueDate');
+    if (dueDateEl) dueDateEl.valueAsDate = dueDate;
 
     // reset services table to one empty row
     const table = document.getElementById('servicesTable');
-    table.innerHTML = '';
-    addServiceRow();
+    if (table) {
+      table.innerHTML = '';
+      addServiceRow();
+    }
 
     // set invoice number to next available but do NOT increment lastInvoiceNumber yet
     let nextNum = parseInt(localStorage.getItem('lastInvoiceNumber') || '1', 10);
     if (isNaN(nextNum) || nextNum < 1) nextNum = 1;
-    document.getElementById('invoiceNumber').value = `INV-${String(nextNum).padStart(4, '0')}`;
+    const invoiceNumber = document.getElementById('invoiceNumber');
+    if (invoiceNumber) invoiceNumber.value = `INV-${String(nextNum).padStart(4, '0')}`;
 
     calculateAmounts();
     showToast('New invoice form initialized', 'success');
@@ -793,7 +813,7 @@ function collectInvoiceData() {
       clientAddress: document.getElementById('clientAddress').value,
       paymentMethod: document.getElementById('paymentMethod').value,
       invoiceNotes: document.getElementById('invoiceNotes').value,
-            invoiceStatus: document.getElementById('invoiceStatus') ? document.getElementById('invoiceStatus').value : 'pending',
+      status: document.getElementById('invoiceStatus') ? document.getElementById('invoiceStatus').value : 'pending',
       taxRate: document.getElementById('taxRate').value || '0',
       discount: document.getElementById('discountAmt').value || '0',
       currency: document.getElementById('currencySelect').value || 'USD',
@@ -1148,46 +1168,100 @@ function closeHistoryModal() {
 
 // Mark as paid: show receipt preview and enable receipt download
 async function markAsPaid() {
-        // Mark form status as paid, then save to history to request server receiptNumber and persist payload
-        if (document.getElementById('invoiceStatus')) document.getElementById('invoiceStatus').value = 'paid';
-        await saveToHistory('receipt');
-    const invoiceContent = document.getElementById('invoicePreview').innerHTML;
-    const history = JSON.parse(localStorage.getItem('invoiceHistory')) || [];
-    const invoiceNumber = document.getElementById('invoiceNumber').value;
-    const entry = history.find(h => h.number === invoiceNumber && h.type === 'receipt');
-    const receiptNumber = entry && entry.payload ? entry.payload.receiptNumber : null;
-
-  document.getElementById('receiptPreview').innerHTML = `
-      <div class="relative z-10">
-          ${invoiceContent.replace('INVOICE', 'RECEIPT')}
-          ${receiptNumber ? `<p class="text-sm font-medium">Receipt #: ${receiptNumber}</p>` : ''}
-          <div class="mt-4 p-3 bg-green-50 rounded-md">
-              <p class="text-green-700 text-sm"><i data-feather="check-circle" class="w-4 h-4 inline mr-1"></i> Payment received on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} via ${document.getElementById('paymentMethod').value}</p>
-          </div>
-      </div>
-  `;
-
-  document.getElementById('invoicePreview').classList.add('hidden');
-  document.getElementById('receiptPreview').classList.remove('hidden');
-  document.getElementById('downloadReceiptBtn').classList.remove('hidden');
-  if (window.feather) feather.replace();
+    try {
+        const invoiceData = collectInvoiceData();
+        
+        // Update status on server
+        const response = await fetch('/api/invoices/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...invoiceData, status: 'paid' })
+        });
+        
+        if (response.ok) {
+            showToast('Invoice marked as paid!', 'success');
+            
+            // Update UI
+            if (document.getElementById('invoiceStatus')) {
+                document.getElementById('invoiceStatus').value = 'paid';
+            }
+            updateStatusText();
+            
+            // Show receipt preview (legacy functionality)
+            const invoiceContent = document.getElementById('invoicePreview').innerHTML;
+            document.getElementById('receiptPreview').innerHTML = `
+                <div class="relative z-10">
+                    ${invoiceContent.replace('INVOICE', 'RECEIPT')}
+                    <div class="mt-4 p-3 bg-green-50 rounded-md">
+                        <p class="text-green-700 text-sm"><i data-feather="check-circle" class="w-4 h-4 inline mr-1"></i> Payment received on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} via ${document.getElementById('paymentMethod').value}</p>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('invoicePreview').classList.add('hidden');
+            document.getElementById('receiptPreview').classList.remove('hidden');
+            document.getElementById('downloadReceiptBtn').classList.remove('hidden');
+            if (window.feather) feather.replace();
+        } else {
+            throw new Error('Failed to update invoice status');
+        }
+    } catch (error) {
+        console.error('Error marking invoice as paid:', error);
+        showToast('Failed to mark invoice as paid. Please try again.', 'error');
+    }
 }
 
 // Save invoice without downloading
 async function saveInvoice() {
-    // Ensure invoiceStatus is set (default pending)
-    if (!document.getElementById('invoiceStatus')) return;
-    document.getElementById('invoiceStatus').value = document.getElementById('invoiceStatus').value || 'pending';
-    await saveToHistory('invoice');
-    // small visual feedback (could be enhanced)
-    alert('Invoice saved to history');
+    try {
+        const invoiceData = collectInvoiceData();
+        
+        // Save to server
+        const response = await fetch('/api/invoices/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(invoiceData)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showToast('Invoice saved successfully!', 'success');
+        } else {
+            throw new Error('Failed to save invoice');
+        }
+    } catch (error) {
+        console.error('Error saving invoice:', error);
+        showToast('Failed to save invoice. Please try again.', 'error');
+    }
 }
 
 // Mark current invoice explicitly as pending (useful if previously marked paid)
 async function markAsPending() {
-    if (document.getElementById('invoiceStatus')) document.getElementById('invoiceStatus').value = 'pending';
-    await saveToHistory('invoice');
-    alert('Invoice marked as pending');
+    try {
+        const invoiceData = collectInvoiceData();
+        
+        // Update status on server
+        const response = await fetch('/api/invoices/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...invoiceData, status: 'pending' })
+        });
+        
+        if (response.ok) {
+            showToast('Invoice marked as pending!', 'success');
+            
+            // Update UI
+            if (document.getElementById('invoiceStatus')) {
+                document.getElementById('invoiceStatus').value = 'pending';
+            }
+            updateStatusText();
+        } else {
+            throw new Error('Failed to update invoice status');
+        }
+    } catch (error) {
+        console.error('Error marking invoice as pending:', error);
+        showToast('Failed to mark invoice as pending. Please try again.', 'error');
+    }
 }
 
 // Mark current invoice as completed and generate receipt
@@ -1329,6 +1403,7 @@ function displaySearchResults(data) {
 
 function getStatusColor(status) {
     switch (status) {
+        case 'draft': return 'bg-gray-100 text-gray-800';
         case 'pending': return 'bg-yellow-100 text-yellow-800';
         case 'paid': return 'bg-green-100 text-green-800';
         case 'completed': return 'bg-purple-100 text-purple-800';
@@ -1360,31 +1435,51 @@ async function loadDocument(type, id) {
 
 function loadInvoiceIntoForm(invoice) {
     // Populate form with invoice data
-    document.getElementById('invoiceNumber').value = invoice.invoiceNumber;
-    document.getElementById('invoiceStatus').value = invoice.status;
-    document.getElementById('issueDate').value = invoice.issueDate;
-    document.getElementById('dueDate').value = invoice.dueDate;
-    document.getElementById('clientName').value = invoice.clientName || '';
-    document.getElementById('clientCompany').value = invoice.clientCompany || '';
-    document.getElementById('clientEmail').value = invoice.clientEmail || '';
-    document.getElementById('clientPhone').value = invoice.clientPhone || '';
-    document.getElementById('clientAddress').value = invoice.clientAddress || '';
-    document.getElementById('currencySelect').value = invoice.currency || 'USD';
-    document.getElementById('taxRate').value = invoice.taxRate || 0;
-    document.getElementById('discountAmt').value = invoice.discount || 0;
-    document.getElementById('invoiceNotes').value = invoice.notes || '';
+    const invoiceNumber = document.getElementById('invoiceNumber');
+    if (invoiceNumber) invoiceNumber.value = invoice.invoiceNumber;
+    const invoiceStatus = document.getElementById('invoiceStatus');
+    if (invoiceStatus) invoiceStatus.value = invoice.status;
+    const issueDate = document.getElementById('issueDate');
+    if (issueDate) issueDate.value = invoice.issueDate;
+    const dueDate = document.getElementById('dueDate');
+    if (dueDate) dueDate.value = invoice.dueDate;
+    const clientName = document.getElementById('clientName');
+    if (clientName) clientName.value = invoice.clientName || '';
+    const clientCompany = document.getElementById('clientCompany');
+    if (clientCompany) clientCompany.value = invoice.clientCompany || '';
+    const clientEmail = document.getElementById('clientEmail');
+    if (clientEmail) clientEmail.value = invoice.clientEmail || '';
+    const clientPhone = document.getElementById('clientPhone');
+    if (clientPhone) clientPhone.value = invoice.clientPhone || '';
+    const clientAddress = document.getElementById('clientAddress');
+    if (clientAddress) clientAddress.value = invoice.clientAddress || '';
+    const currencySelect = document.getElementById('currencySelect');
+    if (currencySelect) currencySelect.value = invoice.currency || 'USD';
+    const taxRate = document.getElementById('taxRate');
+    if (taxRate) taxRate.value = invoice.taxRate || 0;
+    const discountAmt = document.getElementById('discountAmt');
+    if (discountAmt) discountAmt.value = invoice.discount || 0;
+    const invoiceNotes = document.getElementById('invoiceNotes');
+    if (invoiceNotes) invoiceNotes.value = invoice.notes || '';
     
     // Load services
     const servicesTable = document.getElementById('servicesTable');
-    servicesTable.innerHTML = '';
-    
-    invoice.services.forEach((service, index) => {
-        addServiceRow();
-        const row = servicesTable.children[index];
-        row.querySelector('.service-desc').value = service.desc || '';
-        row.querySelector('.service-qty').value = service.qty || 1;
-        row.querySelector('.service-rate').value = service.rate || 0;
-    });
+    if (servicesTable && invoice.services) {
+      servicesTable.innerHTML = '';
+      
+      invoice.services.forEach((service, index) => {
+          addServiceRow();
+          const row = servicesTable.children[index];
+          if (row) {
+            const desc = row.querySelector('.service-desc');
+            if (desc) desc.value = service.desc || '';
+            const qty = row.querySelector('.service-qty');
+            if (qty) qty.value = service.qty || 1;
+            const rate = row.querySelector('.service-rate');
+            if (rate) rate.value = service.rate || 0;
+          }
+      });
+    }
     
     calculateAmounts();
     updatePreview();
