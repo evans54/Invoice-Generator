@@ -1,3 +1,5 @@
+import { debounce, domCache, storage } from './utils.js';
+
 // Frontend application module for Invoice Generator
 // Moved from inline <script> in index.html. This module initializes UI and handles
 // server-side PDF generation (with currency conversion support) and client-side fallback.
@@ -7,7 +9,7 @@ const currencySymbols = {
   KSH: 'KSh ',
   TZS: 'TSh ',
   EURO: '€',
-  PUNDS: '£'
+  POUNDS: '£'
 };
 
 // Static exchange rates relative to USD. These are editable in the module.
@@ -17,7 +19,7 @@ const staticRatesToUSD = {
   KSH: 1 / 155.0,   // 1 KSH ~= 0.00645 USD (i.e., 155 KSH = 1 USD)
   TZS: 1 / 2350.0,  // 1 TZS ~= 0.0004255 USD
   EURO: 1.08,       // 1 EURO ~= 1.08 USD (example static)
-  PUNDS: 1.25      // 1 GBP ~= 1.25 USD (example static)
+  POUNDS: 1.25      // 1 GBP ~= 1.25 USD (example static)
 };
 
 function convertAmount(amount, from, to) {
@@ -33,6 +35,112 @@ function convertAmount(amount, from, to) {
   return converted;
 }
 
+// Form validation and progress tracking
+function validateForm() {
+  const required = ['issueDate', 'dueDate'];
+  let valid = true;
+  let completed = 0;
+  const total = 6; // invoice details, client info, services, totals
+
+  // Check required fields
+  required.forEach(field => {
+    const element = domCache.get(field);
+    if (!element.value.trim()) {
+      element.classList.add('border-red-500');
+      valid = false;
+    } else {
+      element.classList.remove('border-red-500');
+      completed++;
+    }
+  });
+
+  // Check client info (at least name)
+  if (domCache.get('clientName').value.trim()) completed++;
+
+  // Check services (at least one with description and rate)
+  const services = document.querySelectorAll('.service-desc');
+  let hasValidService = false;
+  services.forEach(desc => {
+    const row = desc.closest('tr');
+    const qty = row.querySelector('.service-qty').value;
+    const rate = row.querySelector('.service-rate').value;
+    if (desc.value.trim() && qty && rate) {
+      hasValidService = true;
+    }
+  });
+  if (hasValidService) completed++;
+
+  // Check totals
+  if (domCache.get('totalDue').value !== '$0.00') completed++;
+
+  // Update progress
+  const progress = Math.round((completed / total) * 100);
+  domCache.get('completionProgress').textContent = `${progress}%`;
+  domCache.get('progressBar').style.width = `${progress}%`;
+
+  return valid;
+}
+
+// Update current invoice display
+function updateCurrentInvoiceDisplay() {
+  const invoiceNum = domCache.get('invoiceNumber').value;
+  domCache.get('currentInvoiceDisplay').textContent = invoiceNum;
+}
+
+// Update status text
+function updateStatusText() {
+  const status = domCache.get('invoiceStatus').value;
+  const statusText = domCache.get('statusText');
+  statusText.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+
+  // Update status color
+  statusText.className = 'font-semibold';
+  if (status === 'paid') statusText.classList.add('text-green-600');
+  else if (status === 'pending') statusText.classList.add('text-yellow-600');
+  else statusText.classList.add('text-gray-600');
+}
+
+// Help modal functions
+function openHelpModal() {
+  domCache.get('helpModal').classList.remove('hidden');
+}
+
+function closeHelpModal() {
+  domCache.get('helpModal').classList.add('hidden');
+}
+
+// Keyboard shortcuts
+function handleKeyboardShortcuts(event) {
+  if (event.ctrlKey || event.metaKey) {
+    switch (event.key) {
+      case 's':
+        event.preventDefault();
+        saveInvoice();
+        break;
+      case 'n':
+        event.preventDefault();
+        createNewInvoice();
+        break;
+      case 'p':
+        event.preventDefault();
+        updatePreview();
+        break;
+      case 'd':
+        event.preventDefault();
+        generateInvoiceServerPDF();
+        break;
+      case 'h':
+        event.preventDefault();
+        openHistoryModal();
+        break;
+    }
+  }
+  if (event.key === 'F1') {
+    event.preventDefault();
+    openHelpModal();
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize feather icons
   if (window.feather) feather.replace();
@@ -45,71 +153,91 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('issueDate').valueAsDate = today;
   document.getElementById('dueDate').valueAsDate = dueDate;
 
-  // Initialize invoice number
-    // lastInvoiceNumber is stored as an integer value (next available number)
-    let lastNumRaw = localStorage.getItem('lastInvoiceNumber');
-    let lastNum = lastNumRaw ? parseInt(lastNumRaw, 10) : 1;
-    if (isNaN(lastNum) || lastNum < 1) lastNum = 1;
-    document.getElementById('invoiceNumber').value = `INV-${String(lastNum).padStart(4, '0')}`;
+  // Initialize invoice number using optimized storage
+  let lastNumRaw = storage.get('lastInvoiceNumber');
+  let lastNum = lastNumRaw ? parseInt(lastNumRaw, 10) : 1;
+  if (isNaN(lastNum) || lastNum < 1) lastNum = 1;
+  domCache.get('invoiceNumber').value = `INV-${String(lastNum).padStart(4, '0')}`;
 
-  // Event listeners
-  document.getElementById('addService').addEventListener('click', addServiceRow);
-  document.getElementById('previewBtn').addEventListener('click', updatePreview);
-  document.getElementById('generateInvoiceBtn').addEventListener('click', generateInvoiceServerPDF);
-    // New save & pending buttons
-    const saveBtn = document.getElementById('saveInvoiceBtn');
-    if (saveBtn) saveBtn.addEventListener('click', async () => { await saveInvoice(); });
-    const pendingBtn = document.getElementById('markAsPendingBtn');
-    if (pendingBtn) pendingBtn.addEventListener('click', async () => { await markAsPending(); });
+  // Update displays
+  updateCurrentInvoiceDisplay();
+  updateStatusText();
+
+  // Event listeners with optimized DOM access
+  domCache.get('addService').addEventListener('click', addServiceRow);
+  domCache.get('previewBtn').addEventListener('click', updatePreview);
+  domCache.get('generateInvoiceBtn').addEventListener('click', generateInvoiceServerPDF);
+  // New save & pending buttons
+  const saveBtn = document.getElementById('saveInvoiceBtn');
+  if (saveBtn) saveBtn.addEventListener('click', async () => { await saveInvoice(); });
+  const pendingBtn = document.getElementById('markAsPendingBtn');
+  if (pendingBtn) pendingBtn.addEventListener('click', async () => { await markAsPending(); });
   document.getElementById('markAsPaidBtn').addEventListener('click', markAsPaid);
   document.getElementById('downloadReceiptBtn').addEventListener('click', generateReceiptServerPDF);
   document.getElementById('historyBtn').addEventListener('click', openHistoryModal);
   document.getElementById('closeHistoryModal').addEventListener('click', closeHistoryModal);
-    // Receipts dashboard
-    const receiptsBtn = document.getElementById('receiptsBtn');
-    if (receiptsBtn) receiptsBtn.addEventListener('click', openReceiptsModal);
-    const closeReceipts = document.getElementById('closeReceiptsModal');
-    if (closeReceipts) closeReceipts.addEventListener('click', closeReceiptsModal);
-        // Create new invoice button
-        const createNewBtn = document.getElementById('createNewInvoiceBtn');
-        if (createNewBtn) createNewBtn.addEventListener('click', () => { createNewInvoice(); });
-        const duplicateBtn = document.getElementById('duplicateInvoiceBtn');
-        if (duplicateBtn) duplicateBtn.addEventListener('click', () => { duplicateInvoice(); });
-        // Duplicate confirm modal buttons
-        const cancelDup = document.getElementById('cancelDuplicateBtn');
-        const confirmDup = document.getElementById('confirmDuplicateBtn');
-        if (cancelDup) cancelDup.addEventListener('click', () => { document.getElementById('confirmDuplicateModal').classList.add('hidden'); });
-        if (confirmDup) confirmDup.addEventListener('click', () => { document.getElementById('confirmDuplicateModal').classList.add('hidden'); actuallyConfirmDuplicate(); });
+  // Receipts dashboard
+  const receiptsBtn = document.getElementById('receiptsBtn');
+  if (receiptsBtn) receiptsBtn.addEventListener('click', openReceiptsModal);
+  const closeReceipts = document.getElementById('closeReceiptsModal');
+  if (closeReceipts) closeReceipts.addEventListener('click', closeReceiptsModal);
+  // Create new invoice button
+  const createNewBtn = document.getElementById('createNewInvoiceBtn');
+  if (createNewBtn) createNewBtn.addEventListener('click', () => { createNewInvoice(); });
+  const duplicateBtn = document.getElementById('duplicateInvoiceBtn');
+  if (duplicateBtn) duplicateBtn.addEventListener('click', () => { duplicateInvoice(); });
+  // Duplicate confirm modal buttons
+  const cancelDup = document.getElementById('cancelDuplicateBtn');
+  const confirmDup = document.getElementById('confirmDuplicateBtn');
+  if (cancelDup) cancelDup.addEventListener('click', () => { document.getElementById('confirmDuplicateModal').classList.add('hidden'); });
+  if (confirmDup) confirmDup.addEventListener('click', () => { document.getElementById('confirmDuplicateModal').classList.add('hidden'); actuallyConfirmDuplicate(); });
 
-        // History download selected (downloads most recent by default)
-        const downloadSelectedHistoryBtn = document.getElementById('downloadSelectedHistoryBtn');
-        if (downloadSelectedHistoryBtn) downloadSelectedHistoryBtn.addEventListener('click', downloadSelectedFromHistory);
+  // Help modal
+  const helpBtn = document.getElementById('helpBtn');
+  if (helpBtn) helpBtn.addEventListener('click', openHelpModal);
+  const closeHelp = document.getElementById('closeHelpModal');
+  if (closeHelp) closeHelp.addEventListener('click', closeHelpModal);
 
-  // Calculate amounts when inputs change
-  document.addEventListener('input', function(e) {
-      if (e.target.classList.contains('service-qty') || 
-          e.target.classList.contains('service-rate') ||
-          e.target.id === 'taxRate' ||
-          e.target.id === 'discountAmt' ||
-          e.target.id === 'currencySelect') {
-          calculateAmounts();
-      }
-  });
+  // History download selected (downloads most recent by default)
+  const downloadSelectedHistoryBtn = document.getElementById('downloadSelectedHistoryBtn');
+  if (downloadSelectedHistoryBtn) downloadSelectedHistoryBtn.addEventListener('click', downloadSelectedFromHistory);
 
-  // Initial calculation
+  // Enhanced form input handling with validation
+  document.addEventListener('input', debounce(function(e) {
+    if (e.target.classList.contains('service-qty') ||
+      e.target.classList.contains('service-rate') ||
+      e.target.id === 'taxRate' ||
+      e.target.id === 'discountAmt' ||
+      e.target.id === 'currencySelect') {
+      calculateAmounts();
+    }
+
+    // Update progress and validation
+    validateForm();
+    updateCurrentInvoiceDisplay();
+  }, 300));
+
+  // Status change handler
+  document.getElementById('invoiceStatus').addEventListener('change', updateStatusText);
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', handleKeyboardShortcuts);
+
+  // Initial calculation and validation
   calculateAmounts();
+  validateForm();
 });
 
 // Toast helper (non-blocking inline notifications)
 function showToast(message, type = 'info', timeout = 3000) {
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
-    const el = document.createElement('div');
-    const color = type === 'success' ? 'bg-green-100 text-green-800' : type === 'error' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800';
-    el.className = `${color} px-4 py-2 rounded shadow-md`;
-    el.innerText = message;
-    container.appendChild(el);
-    setTimeout(() => { el.remove(); }, timeout);
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const el = document.createElement('div');
+  const color = type === 'success' ? 'bg-green-100 text-green-800' : type === 'error' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800';
+  el.className = `${color} px-4 py-2 rounded shadow-md`;
+  el.innerText = message;
+  container.appendChild(el);
+  setTimeout(() => { el.remove(); }, timeout);
 }
 
 // Create a new invoice form (does not increment lastInvoiceNumber until save)
@@ -377,6 +505,10 @@ function updatePreview() {
       <div class="mb-8">
           <div class="flex justify-between items-start mb-8">
               <div>
+                  <!-- Company Logo -->
+                  <div class="mb-4">
+                      <img src="assets/logo.png" alt="Company Logo" class="h-16 w-auto max-w-32 object-contain" onerror="this.style.display='none'">
+                  </div>
                   <div class="w-16 h-16 bg-lessy-blue rounded-lg flex items-center justify-center mb-2">
                       <i data-feather="file-text" class="text-lessy-gold w-8 h-8"></i>
                   </div>

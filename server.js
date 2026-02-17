@@ -1,15 +1,90 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { streamInvoicePDF } = require('./lib/server-app');
 
+// Load environment variables
+require('dotenv').config();
+
 const app = express();
-app.use(cors());
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.tailwindcss.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
+
+// Configure CORS for specific origins in production
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    // In production, allow the same origin as the server
+    if (process.env.NODE_ENV === 'production') {
+      const allowedOrigins = [
+        process.env.FRONTEND_URL, // Custom frontend URL if set
+        // Add your production domain here when you know it
+        // 'https://yourdomain.com',
+        // 'https://www.yourdomain.com'
+      ].filter(Boolean); // Remove undefined values
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error('Not allowed by CORS'));
+      }
+    }
+
+    // In development, allow all origins
+    return callback(null, true);
+  },
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+app.use(cors(corsOptions));
+
+// Rate limiting to prevent abuse
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later.' }
+});
+app.use('/api/', limiter);
+
 app.use(bodyParser.json({ limit: '2mb' }));
+
+// Serve static files (frontend)
+app.use(express.static('.'));
+
+// Route for root path - serve the main HTML file
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/index.html');
+});
 
 app.post('/api/invoice', (req, res) => {
   try {
     const data = req.body || {};
+    
+    // Basic input validation
+    if (!data.invoiceNumber || typeof data.invoiceNumber !== 'string') {
+      return res.status(400).json({ error: 'Invalid invoice number' });
+    }
+    
+    if (data.services && !Array.isArray(data.services)) {
+      return res.status(400).json({ error: 'Services must be an array' });
+    }
+    
     // Default to invoice; allow 'type' to be 'receipt'
     data.type = data.type || 'invoice';
     streamInvoicePDF(res, data);
