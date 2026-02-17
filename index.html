@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -88,6 +88,20 @@
                 </div>
             </div>
             <div class="flex items-center gap-4">
+                <!-- Search Bar -->
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Search invoices/receipts..." 
+                        class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lessy-blue w-64"
+                    >
+                    <i data-feather="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
+                    <div id="searchResults" class="absolute top-full mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg hidden z-50 max-h-80 overflow-y-auto">
+                        <!-- Search results will be populated here -->
+                    </div>
+                </div>
+                
                 <div class="text-right">
                     <div class="text-sm text-gray-600">Current Invoice</div>
                     <div id="currentInvoiceDisplay" class="font-semibold text-lessy-blue">INV-0001</div>
@@ -151,6 +165,7 @@
                                 <option value="draft">📝 Draft</option>
                                 <option value="pending" selected>⏳ Pending</option>
                                 <option value="paid">✅ Paid</option>
+                                <option value="completed">🎉 Completed</option>
                             </select>
                         </div>
                         <div class="mt-2">
@@ -318,6 +333,10 @@
                     <button id="markAsPaidBtn" class="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-opacity-90 transition text-sm flex items-center">
                         <i data-feather="check-circle" class="mr-1 w-4 h-4"></i>
                         <span class="hidden sm:inline">Mark Paid</span>
+                    </button>
+                    <button id="markAsCompletedBtn" class="px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-opacity-90 transition text-sm flex items-center">
+                        <i data-feather="award" class="mr-1 w-4 h-4"></i>
+                        <span class="hidden sm:inline">Complete</span>
                     </button>
                 </div>
             </div>
