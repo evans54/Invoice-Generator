@@ -97,6 +97,7 @@ function updateStatusText() {
   statusText.className = 'font-semibold';
   if (status === 'paid') statusText.classList.add('text-green-600');
   else if (status === 'pending') statusText.classList.add('text-yellow-600');
+  else if (status === 'completed') statusText.classList.add('text-purple-600');
   else statusText.classList.add('text-gray-600');
 }
 
@@ -165,7 +166,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Event listeners with optimized DOM access
   domCache.get('addService').addEventListener('click', addServiceRow);
-  domCache.get('previewBtn').addEventListener('click', updatePreview);
   domCache.get('generateInvoiceBtn').addEventListener('click', generateInvoiceServerPDF);
   // New save & pending buttons
   const saveBtn = document.getElementById('saveInvoiceBtn');
@@ -173,6 +173,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const pendingBtn = document.getElementById('markAsPendingBtn');
   if (pendingBtn) pendingBtn.addEventListener('click', async () => { await markAsPending(); });
   document.getElementById('markAsPaidBtn').addEventListener('click', markAsPaid);
+  const completedBtn = document.getElementById('markAsCompletedBtn');
+  if (completedBtn) completedBtn.addEventListener('click', markAsCompleted);
   document.getElementById('downloadReceiptBtn').addEventListener('click', generateReceiptServerPDF);
   document.getElementById('historyBtn').addEventListener('click', openHistoryModal);
   document.getElementById('closeHistoryModal').addEventListener('click', closeHistoryModal);
@@ -202,7 +204,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const downloadSelectedHistoryBtn = document.getElementById('downloadSelectedHistoryBtn');
   if (downloadSelectedHistoryBtn) downloadSelectedHistoryBtn.addEventListener('click', downloadSelectedFromHistory);
 
-  // Enhanced form input handling with validation
+  // Search functionality
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', debounce(handleSearch, 300));
+    searchInput.addEventListener('focus', handleSearch);
+  }
+  
+  // Close search results when clicking outside
+  document.addEventListener('click', (e) => {
+    const searchResults = document.getElementById('searchResults');
+    const searchInput = document.getElementById('searchInput');
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+      searchResults.classList.add('hidden');
+    }
+  });
+
+  // Enhanced form input handling with validation and automatic preview
   document.addEventListener('input', debounce(function(e) {
     if (e.target.classList.contains('service-qty') ||
       e.target.classList.contains('service-rate') ||
@@ -215,6 +233,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update progress and validation
     validateForm();
     updateCurrentInvoiceDisplay();
+    // Automatically update preview when form changes
+    updatePreview();
+  }, 500));
+
+  // Handle select elements and other form controls that trigger change events
+  document.addEventListener('change', debounce(function(e) {
+    if (e.target.tagName === 'SELECT' ||
+        e.target.type === 'date' ||
+        e.target.type === 'email' ||
+        e.target.type === 'tel') {
+      // Update progress and validation
+      validateForm();
+      updateCurrentInvoiceDisplay();
+      // Automatically update preview when form changes
+      updatePreview();
+    }
   }, 300));
 
   // Status change handler
@@ -1154,6 +1188,252 @@ async function markAsPending() {
     if (document.getElementById('invoiceStatus')) document.getElementById('invoiceStatus').value = 'pending';
     await saveToHistory('invoice');
     alert('Invoice marked as pending');
+}
+
+// Mark current invoice as completed and generate receipt
+async function markAsCompleted() {
+    try {
+        const invoiceData = collectInvoiceData();
+        
+        // Update status on server
+        const response = await fetch('/api/invoices/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...invoiceData, status: 'completed' })
+        });
+        
+        if (response.ok) {
+            // Find the invoice ID and generate receipt
+            const invoicesResponse = await fetch('/api/invoices');
+            const invoicesData = await invoicesResponse.json();
+            const currentInvoice = invoicesData.invoices.find(inv => inv.invoiceNumber === invoiceData.invoiceNumber);
+            
+            if (currentInvoice) {
+                const receiptResponse = await fetch('/api/receipts/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ invoiceId: currentInvoice.id })
+                });
+                
+                if (receiptResponse.ok) {
+                    const receiptData = await receiptResponse.json();
+                    showToast('Invoice completed and receipt generated!', 'success');
+                    
+                    // Update UI
+                    if (document.getElementById('invoiceStatus')) {
+                        document.getElementById('invoiceStatus').value = 'completed';
+                    }
+                    updateStatusText();
+                    
+                    // Show receipt preview
+                    showReceiptPreview(receiptData.receipt);
+                } else {
+                    throw new Error('Failed to generate receipt');
+                }
+            }
+        } else {
+            throw new Error('Failed to update invoice status');
+        }
+    } catch (error) {
+        console.error('Error marking invoice as completed:', error);
+        showToast('Failed to complete invoice. Please try again.', 'error');
+    }
+}
+
+// Search functionality
+async function handleSearch(event) {
+    const query = event.target.value.trim();
+    const searchResults = document.getElementById('searchResults');
+    
+    if (query.length < 2) {
+        searchResults.classList.add('hidden');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/documents/search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
+        if (data.total > 0) {
+            displaySearchResults(data);
+            searchResults.classList.remove('hidden');
+        } else {
+            searchResults.innerHTML = `
+                <div class="p-4 text-center text-gray-500">
+                    <i data-feather="search" class="w-8 h-8 mx-auto mb-2"></i>
+                    <p class="text-sm">No results found for "${query}"</p>
+                </div>
+            `;
+            searchResults.classList.remove('hidden');
+        }
+        
+        if (window.feather) feather.replace();
+    } catch (error) {
+        console.error('Search error:', error);
+        searchResults.classList.add('hidden');
+    }
+}
+
+function displaySearchResults(data) {
+    const searchResults = document.getElementById('searchResults');
+    
+    const invoicesHtml = data.invoices.map(invoice => `
+        <div class="p-3 hover:bg-gray-50 cursor-pointer border-b search-result" data-type="invoice" data-id="${invoice.id}">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="font-medium text-lessy-blue">${invoice.invoiceNumber}</div>
+                    <div class="text-sm text-gray-600">${invoice.clientName}</div>
+                    <div class="text-xs text-gray-500">${new Date(invoice.createdAt).toLocaleDateString()}</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm font-medium">${invoice.currency} ${invoice.total.toFixed(2)}</div>
+                    <div class="text-xs px-2 py-1 rounded-full inline-block ${getStatusColor(invoice.status)}">
+                        ${invoice.status}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    const receiptsHtml = data.receipts.map(receipt => `
+        <div class="p-3 hover:bg-gray-50 cursor-pointer border-b search-result" data-type="receipt" data-id="${receipt.id}">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="font-medium text-green-600">${receipt.receiptNumber}</div>
+                    <div class="text-sm text-gray-600">${receipt.clientName}</div>
+                    <div class="text-xs text-gray-500">${new Date(receipt.createdAt).toLocaleDateString()}</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm font-medium">${receipt.currency} ${receipt.amount.toFixed(2)}</div>
+                    <div class="text-xs px-2 py-1 rounded-full inline-block bg-green-100 text-green-800">
+                        Receipt
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    searchResults.innerHTML = invoicesHtml + receiptsHtml;
+    
+    // Add click handlers
+    searchResults.querySelectorAll('.search-result').forEach(result => {
+        result.addEventListener('click', () => {
+            const type = result.dataset.type;
+            const id = result.dataset.id;
+            loadDocument(type, id);
+            searchResults.classList.add('hidden');
+            document.getElementById('searchInput').value = '';
+        });
+    });
+}
+
+function getStatusColor(status) {
+    switch (status) {
+        case 'pending': return 'bg-yellow-100 text-yellow-800';
+        case 'paid': return 'bg-green-100 text-green-800';
+        case 'completed': return 'bg-purple-100 text-purple-800';
+        default: return 'bg-gray-100 text-gray-800';
+    }
+}
+
+async function loadDocument(type, id) {
+    try {
+        const endpoint = type === 'invoice' ? '/api/invoices' : '/api/receipts';
+        const response = await fetch(endpoint);
+        const data = await response.json();
+        
+        const documents = type === 'invoice' ? data.invoices : data.receipts;
+        const document = documents.find(doc => doc.id === id);
+        
+        if (document) {
+            if (type === 'invoice') {
+                loadInvoiceIntoForm(document);
+            } else {
+                showReceiptPreview(document);
+            }
+        }
+    } catch (error) {
+        console.error('Error loading document:', error);
+        showToast('Failed to load document', 'error');
+    }
+}
+
+function loadInvoiceIntoForm(invoice) {
+    // Populate form with invoice data
+    document.getElementById('invoiceNumber').value = invoice.invoiceNumber;
+    document.getElementById('invoiceStatus').value = invoice.status;
+    document.getElementById('issueDate').value = invoice.issueDate;
+    document.getElementById('dueDate').value = invoice.dueDate;
+    document.getElementById('clientName').value = invoice.clientName || '';
+    document.getElementById('clientCompany').value = invoice.clientCompany || '';
+    document.getElementById('clientEmail').value = invoice.clientEmail || '';
+    document.getElementById('clientPhone').value = invoice.clientPhone || '';
+    document.getElementById('clientAddress').value = invoice.clientAddress || '';
+    document.getElementById('currencySelect').value = invoice.currency || 'USD';
+    document.getElementById('taxRate').value = invoice.taxRate || 0;
+    document.getElementById('discountAmt').value = invoice.discount || 0;
+    document.getElementById('invoiceNotes').value = invoice.notes || '';
+    
+    // Load services
+    const servicesTable = document.getElementById('servicesTable');
+    servicesTable.innerHTML = '';
+    
+    invoice.services.forEach((service, index) => {
+        addServiceRow();
+        const row = servicesTable.children[index];
+        row.querySelector('.service-desc').value = service.desc || '';
+        row.querySelector('.service-qty').value = service.qty || 1;
+        row.querySelector('.service-rate').value = service.rate || 0;
+    });
+    
+    calculateAmounts();
+    updatePreview();
+    updateStatusText();
+    updateCurrentInvoiceDisplay();
+    
+    showToast('Invoice loaded successfully', 'success');
+}
+
+function showReceiptPreview(receipt) {
+    const receiptPreview = document.getElementById('receiptPreview');
+    const invoicePreview = document.getElementById('invoicePreview');
+    const downloadReceiptBtn = document.getElementById('downloadReceiptBtn');
+    
+    receiptPreview.innerHTML = `
+        <div class="relative z-10 p-6">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-lessy-blue">RECEIPT</h2>
+                <p class="text-gray-600">Receipt #: ${receipt.receiptNumber}</p>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                    <p class="font-semibold">Client:</p>
+                    <p>${receipt.clientName}</p>
+                    ${receipt.clientCompany ? `<p>${receipt.clientCompany}</p>` : ''}
+                </div>
+                <div class="text-right">
+                    <p class="font-semibold">Date:</p>
+                    <p>${new Date(receipt.receiptDate).toLocaleDateString()}</p>
+                    <p class="font-semibold">Amount:</p>
+                    <p class="text-xl">${receipt.currency} ${receipt.amount.toFixed(2)}</p>
+                </div>
+            </div>
+            
+            <div class="text-center p-4 bg-green-50 rounded-lg">
+                <p class="text-green-700 font-semibold">
+                    <i data-feather="check-circle" class="w-5 h-5 inline mr-1"></i>
+                    Payment Received
+                </p>
+            </div>
+        </div>
+    `;
+    
+    invoicePreview.classList.add('hidden');
+    receiptPreview.classList.remove('hidden');
+    downloadReceiptBtn.classList.remove('hidden');
+    
+    if (window.feather) feather.replace();
 }
 
 // Expose a minimal API for tests or other scripts if needed

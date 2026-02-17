@@ -72,7 +72,7 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
 
-app.post('/api/invoice', (req, res) => {
+app.post('/api/invoice', async (req, res) => {
   try {
     const data = req.body || {};
     
@@ -87,6 +87,19 @@ app.post('/api/invoice', (req, res) => {
     
     // Default to invoice; allow 'type' to be 'receipt'
     data.type = data.type || 'invoice';
+    
+    // Auto-save invoice with pending status
+    try {
+      const { saveInvoice } = require('./lib/document-manager');
+      await saveInvoice({
+        ...data,
+        status: 'pending'
+      });
+    } catch (saveError) {
+      console.warn('Failed to auto-save invoice:', saveError);
+      // Continue with PDF generation even if save fails
+    }
+    
     streamInvoicePDF(res, data);
   } catch (err) {
     console.error('Invoice generation error', err);
@@ -102,6 +115,78 @@ app.post('/api/receipt-number', (req, res) => {
   } catch (err) {
     console.error('Failed to generate receipt number', err);
     res.status(500).json({ error: 'Failed to generate receipt number' });
+  }
+});
+
+// Save invoice with status
+app.post('/api/invoices/save', async (req, res) => {
+  try {
+    const { saveInvoice } = require('./lib/document-manager');
+    const result = await saveInvoice(req.body);
+    res.json(result);
+  } catch (err) {
+    console.error('Failed to save invoice', err);
+    res.status(500).json({ error: 'Failed to save invoice' });
+  }
+});
+
+// Update invoice status
+app.put('/api/invoices/:id/status', async (req, res) => {
+  try {
+    const { updateInvoiceStatus } = require('./lib/document-manager');
+    const result = await updateInvoiceStatus(req.params.id, req.body.status);
+    res.json(result);
+  } catch (err) {
+    console.error('Failed to update invoice status', err);
+    res.status(500).json({ error: 'Failed to update invoice status' });
+  }
+});
+
+// Generate receipt for completed invoice
+app.post('/api/receipts/generate', async (req, res) => {
+  try {
+    const { generateReceipt } = require('./lib/document-manager');
+    const result = await generateReceipt(req.body.invoiceId);
+    res.json(result);
+  } catch (err) {
+    console.error('Failed to generate receipt', err);
+    res.status(500).json({ error: 'Failed to generate receipt' });
+  }
+});
+
+// Search invoices and receipts
+app.get('/api/documents/search', async (req, res) => {
+  try {
+    const { searchDocuments } = require('./lib/document-manager');
+    const result = await searchDocuments(req.query.q);
+    res.json(result);
+  } catch (err) {
+    console.error('Failed to search documents', err);
+    res.status(500).json({ error: 'Failed to search documents' });
+  }
+});
+
+// Get all invoices
+app.get('/api/invoices', async (req, res) => {
+  try {
+    const { getInvoices } = require('./lib/document-manager');
+    const result = await getInvoices();
+    res.json(result);
+  } catch (err) {
+    console.error('Failed to get invoices', err);
+    res.status(500).json({ error: 'Failed to get invoices' });
+  }
+});
+
+// Get all receipts
+app.get('/api/receipts', async (req, res) => {
+  try {
+    const { getReceipts } = require('./lib/document-manager');
+    const result = await getReceipts();
+    res.json(result);
+  } catch (err) {
+    console.error('Failed to get receipts', err);
+    res.status(500).json({ error: 'Failed to get receipts' });
   }
 });
 
